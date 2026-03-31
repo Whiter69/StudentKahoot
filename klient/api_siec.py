@@ -14,7 +14,7 @@ def join_room(pin,nick):
     try:
         response=requests.post(f"{SERVER_URL}/join_room",json={"pin":pin,"nick":nick})
         data=response.json()
-        return data.get("sukces"),data.get("message")
+        return data
     except Exception as e:
         print(f"Nie można połączyć się z serwerem: {e}")
         return False,"Błąd połączenia z serwerem"
@@ -31,6 +31,15 @@ def check_room_status(pin):
 def send_category(pin,category):
     try:
         response=requests.post(f"{SERVER_URL}/choose_category",json={"pin":pin,"category":category})
+        data=response.json()
+        return data.get("sukces"),data.get("message")
+    except Exception as e:
+        print(f"Nie można połączyć się z serwerem: {e}")
+        return {"sukces": False, "message": "Błąd połączenia z serwerem"}
+
+def get_question(pin):
+    try:
+        response=requests.post(f"{SERVER_URL}/send_question",json={"pin":pin})
         data=response.json()
         return data
     except Exception as e:
