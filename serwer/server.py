@@ -77,7 +77,7 @@ class QuizServer:
 
         try:
             prompt = f"""
-               Jesteś profesjonalnym generatorem quizów. Wygeneruj 1 pytanie z kategorii: {category}.
+               Jesteś profesjonalnym generatorem quizów. Wygeneruj 1 proste pytanie z kategorii: {category}.
                ZAKAZ POWTÓREK: NIE WOLNO Ci użyć tych pytań: {history_text}.
                Zwróć odpowiedź TYLKO w formacie JSON:
                {{
@@ -93,6 +93,30 @@ class QuizServer:
             )
             clear_text = response.text.replace('```json', '').replace('```', '').strip()
             generated_question = json.loads(clear_text)
+
+            try:
+                conn = sqlite3.connect("quiz_baza.db")
+                cursor = conn.cursor()
+
+                question_content = generated_question["question_content"]
+                cursor.execute("SELECT id FROM pytania WHERE tresc = ?", (question_content,))
+                exists = cursor.fetchone()
+
+                if not exists:
+                    ans = generated_question["answers"]
+                    correct = generated_question["correct_answer"]
+
+                    cursor.execute('''
+                                   INSERT INTO pytania (kategoria, tresc, odp_a, odp_b, odp_c, odp_d, poprawna)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                                   ''', (category, question_content, ans[0], ans[1], ans[2], ans[3], correct))
+
+                    conn.commit()
+                    print(f"[BAZA] Zapisano nowe pytanie od AI do bazy! Tresc: '{question_content[:30]}...'")
+
+                conn.close()
+            except Exception as e:
+                print(f"Błąd podczas dodawania pytania AI do bazy: {e}")
 
             self.active_games[pin]["current_question"] = generated_question
             self.active_games[pin]["status"] = "question"
@@ -152,17 +176,21 @@ class QuizServer:
         if pin not in self.active_games:
             return jsonify({"sukces": False, "message": "Nie znaleziono pokoju"})
 
-        correct_answer = self.active_games[pin].get("current_question", {}).get("correct_answer")
+        current_question = self.active_games[pin].get("current_question")
+
+        if current_question is None:
+            return jsonify({"sukces": False, "message": "Runda już się zakończyła!"})
+
+        correct_answer = current_question.get("correct_answer")
 
         if not correct_answer:
-            return jsonify({"sukces": False, "message": "Brak aktywnego pytania"})
+            return jsonify({"sukces": False, "message": "Brak poprawnej odpowiedzi w strukturze pytania"})
 
         if answer == correct_answer:
             self.active_games[pin]["scores"][nick] += 1
             return jsonify({"sukces": True, "message": "Poprawna odpowiedź!"})
         else:
             return jsonify({"sukces": True, "message": f"Niepoprawna odpowiedź! Poprawna to: {correct_answer}"})
-
     def next_round(self):
         data = request.json
         pin = data.get("pin")
@@ -214,10 +242,10 @@ class QuizServer:
             return jsonify({"sukces": False, "message": "Nie znaleziono pokoju"})
 
     def run(self):
-        self.app.run(debug=True)
+        self.app.run('0.0.0.0',port=5000,debug=True)
 
 
 if __name__ == "__main__":
-    GEMINI_KEY = "AIzaSyCrzb6lkBvS_VAKs3_Apll1Pi3nRDXKsSc"
+    GEMINI_KEY = "klucz"
     server = QuizServer(api_key=GEMINI_KEY)
     server.run()

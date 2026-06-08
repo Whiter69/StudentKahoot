@@ -4,6 +4,10 @@ class QuizAPIClient:
     def __init__(self, server_url="http://127.0.0.1:5000"):
         self.server_url = server_url
 
+    def set_server_ip(self, ip_address):
+        ip_address = ip_address.strip()
+        self.server_url = f"http://{ip_address}:5000"
+
     def make_new_room(self, host):
         try:
             response = requests.post(f"{self.server_url}/create_room", json={"host": host})

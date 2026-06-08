@@ -1,8 +1,20 @@
 import customtkinter as ctk
 import threading
 from api_siec import QuizAPIClient
+import socket
+import textwrap
 
 
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
 
 class QuizApp(ctk.CTk):
     def __init__(self):
@@ -23,6 +35,8 @@ class QuizApp(ctk.CTk):
 
 
         self.show_main_menu()
+
+
 
     def clear_screen(self):
         for widget in self.winfo_children():
@@ -66,7 +80,6 @@ class QuizApp(ctk.CTk):
         self.making_game_info = ctk.CTkLabel(self, text="", font=("Arial", 18))
         self.making_game_info.pack(pady=10)
 
-
         btn_back = ctk.CTkButton(self, text="Wróć", font=("Arial", 18), fg_color="transparent", border_width=2,
                                  hover_color="#34495E", command=self.show_main_menu)
         btn_back.pack(pady=40)
@@ -76,15 +89,18 @@ class QuizApp(ctk.CTk):
         self.clear_screen()
 
         title = ctk.CTkLabel(self, text="Dołącz do gry", font=("Arial", 40, "bold"))
-        title.pack(pady=(80, 40))
+        title.pack(pady=(80, 20))
+
+        self.ip_entry = ctk.CTkEntry(self, placeholder_text="IP Serwera (z ekranu Hosta)", width=350, height=50, font=("Arial", 20), justify="center")
+        self.ip_entry.pack(pady=10)
 
         self.nick_entry = ctk.CTkEntry(self, placeholder_text="Podaj swój Nick", width=350, height=50,
                                        font=("Arial", 20), justify="center")
-        self.nick_entry.pack(pady=15)
+        self.nick_entry.pack(pady=10)
 
         self.pin_entry = ctk.CTkEntry(self, placeholder_text="Podaj kod PIN", width=350, height=50, font=("Arial", 20),
                                       justify="center")
-        self.pin_entry.pack(pady=15)
+        self.pin_entry.pack(pady=10)
 
         btn_join = ctk.CTkButton(self, text="Wejdź do gry", font=("Arial", 24, "bold"), height=50, width=350,
                                  fg_color="#3498DB", hover_color="#2980B9", command=self.click_dolacz_do_gry)
@@ -92,7 +108,6 @@ class QuizApp(ctk.CTk):
 
         self.making_game_info = ctk.CTkLabel(self, text="", font=("Arial", 18))
         self.making_game_info.pack(pady=10)
-
 
         btn_back = ctk.CTkButton(self, text="Wróć", font=("Arial", 18), fg_color="transparent", border_width=2,
                                  hover_color="#34495E", command=self.show_main_menu)
@@ -107,33 +122,40 @@ class QuizApp(ctk.CTk):
         self.making_game_info.configure(text="Tworzenie serwera...", text_color="#F1C40F")
         self.update()
 
+        my_ip = get_local_ip()
+        self.api.set_server_ip(my_ip)
+
         generated_pin = self.api.make_new_room(player)
         self.my_nick = player
         self.my_pin = generated_pin
 
-        self.show_waiting_screen(f"Twój PIN do gry to:\n\n{generated_pin}\n\nOczekuję na gracza...")
+        self.show_waiting_screen(f"Twój PIN do gry to: {generated_pin}\n\nIP Serwera dla graczy: {my_ip}\n\nOczekuję na gracza...")
         self.loop_radar()
 
     def click_dolacz_do_gry(self):
+        ip_adres = self.ip_entry.get()
         player = self.nick_entry.get()
         pin = self.pin_entry.get()
 
-        if player == "" or pin == "":
-            self.making_game_info.configure(text="Wypełnij wszystkie pola!", text_color="red")
+        if player == "" or pin == "" or ip_adres == "":
+            self.making_game_info.configure(text="Wypełnij wszystkie pola (w tym IP)!", text_color="red")
             return
 
         self.making_game_info.configure(text="Łączenie...", text_color="#F1C40F")
         self.update()
 
+        self.api.set_server_ip(ip_adres)
+
         response = self.api.join_room(pin, player)
 
-        if response.get("sukces"):
+        if response and response.get("sukces"):
             self.my_nick = player
             self.my_pin = pin
             self.show_waiting_screen("Udało się dołączyć!\n\nCzekaj, aż Host wybierze kategorię...")
             self.loop_radar()
         else:
-            self.making_game_info.configure(text=response.get("message"), text_color="red")
+            msg = response.get("message") if response else "Błąd połączenia z tym IP!"
+            self.making_game_info.configure(text=msg, text_color="red")
 
     def show_waiting_screen(self, message):
         self.clear_screen()
@@ -163,7 +185,7 @@ class QuizApp(ctk.CTk):
             info = ctk.CTkLabel(self, text="Jesteś Hostem! Rozpocznij grę.", font=("Arial", 20), text_color="#BDC3C7")
             info.pack(pady=10)
 
-            # Ramka na przyciski kategorii w siatce 2x2
+
             cat_frame = ctk.CTkFrame(self, fg_color="transparent")
             cat_frame.pack(pady=20, padx=40, fill="both", expand=True)
 
@@ -274,7 +296,7 @@ class QuizApp(ctk.CTk):
 
         kahoot_colors = [("#E74C3C", "#C0392B"), ("#3498DB", "#2980B9"), ("#F1C40F", "#F39C12"), ("#2ECC71", "#27AE60")]
 
-        import textwrap
+
 
         for idx, ans in enumerate(question["answers"]):
             r, c = idx // 2, idx % 2

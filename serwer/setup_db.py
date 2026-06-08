@@ -1,7 +1,7 @@
 import sqlite3
 
 
-def stworz_baze():
+def create_databse():
     conn = sqlite3.connect("quiz_baza.db")
     cursor = conn.cursor()
 
@@ -141,22 +141,25 @@ def stworz_baze():
              "Etyczny haker testujący zabezpieczenia")
         ]
     }
+    cursor.execute('SELECT COUNT(*) FROM pytania')
+    ilosc_pytan = cursor.fetchone()[0]
 
-    print("Wgrywanie pytań...")
-    for kategoria, pytania in baza_pytan.items():
-        for pytanie in pytania:
-            tresc = pytanie[0]
-            odp = pytanie[1]
-            poprawna = pytanie[2]
-            cursor.execute('''
-                           INSERT INTO pytania (kategoria, tresc, odp_a, odp_b, odp_c, odp_d, poprawna)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)
-                           ''', (kategoria, tresc, odp[0], odp[1], odp[2], odp[3], poprawna))
+    if ilosc_pytan == 0:
+        print("Wgrywanie podstawowych pytań (baza była pusta)...")
+        for category, questions in baza_pytan.items():
+            for question in questions:
+                content = question[0]
+                ans = question[1]
+                correct = question[2]
+                cursor.execute('''
+                               INSERT INTO pytania (kategoria, tresc, odp_a, odp_b, odp_c, odp_d, poprawna)
+                               VALUES (?, ?, ?, ?, ?, ?, ?)
+                               ''', (category, content, ans[0], ans[1], ans[2], ans[3], correct))
+        print("GOTOWE! Wgrano pytania startowe.")
+    else:
+        print(f"Baza posiada już {ilosc_pytan} pytań.")
 
     conn.commit()
     conn.close()
-    print("GOTOWE! Plik 'quiz_baza.db' został utworzony.")
-
-
 if __name__ == "__main__":
-    stworz_baze()
+    create_databse()
